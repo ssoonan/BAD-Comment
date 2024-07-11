@@ -1,9 +1,10 @@
+import datetime
+from typing import List, Tuple
 from flask import session, abort, jsonify, Blueprint, redirect, url_for, Response
-from typing import Dict
-import requests
 import googleapiclient.discovery
 import googleapiclient.errors
 import google.oauth2.credentials
+import dateparser
 
 from app.auth import _credentials_to_dict
 
@@ -23,6 +24,40 @@ def make_youtube_api():
     return youtube
 
 
+def get_comments_until_datetime(channel_id, target_datetime):
+    comments = []
+    page_token = None
+    while True:
+        each_comments, page_token = _get_comments_by_page_token(
+            channel_id, target_datetime, page_token)
+        comments.extend(each_comments)
+        if page_token is None:
+            break
+    return {'counts': len(comments), 'comments': comments}
+
+
+def _get_comments_by_page_token(channel_id, target_datetime, page_token=None) -> Tuple[List[dict], str]:
+    params = {'allThreadsRelatedToChannelId': channel_id,
+              'part': 'snippet', 'pageToken': page_token}
+    youtube = make_youtube_api()
+    request = youtube.commentThreads().list(**params)
+    response = request.execute()
+    comments = response['items']
+    page_token = response['nextPageToken']
+    filtered_comments = []
+    for comment in comments:
+        comment_datetime = _get_comment_datetime(comment)
+        if comment_datetime < target_datetime:
+            page_token = None
+            break
+        filtered_comments.append(comment)
+    return filtered_comments, page_token
+
+
+def _get_comment_datetime(comment):
+    return dateparser.parse(comment['snippet']['topLevelComment']['snippet']['publishedAt'])
+
+
 @bp.after_request
 def after_api_auth(response: Response):  # 403으로 oauth 동의를 안 할 시
     if response.status_code == 403:
@@ -37,12 +72,12 @@ def index():
 
 @bp.route('/test')
 def test():
-    params = {
-        'allThreadsRelatedToChannelId': 'UC1bbIVz7kQ014sWnY2UXBuQ', 'part': 'snippet'}
-    youtube = make_youtube_api()
-    request = youtube.commentThreads().list(**params)
-    response = request.execute()
-    return jsonify(response)
+    channel_id = 'UC1bbIVz7kQ014sWnY2UXBuQ'
+    target_datetime = datetime.datetime.now(
+        tz=datetime.UTC) - datetime.timedelta(days=1)
+
+    comments = get_comments_until_datetime(channel_id, target_datetime)
+    return jsonify(comments)
 
 
 def print_index_table():
