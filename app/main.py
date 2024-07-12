@@ -6,6 +6,7 @@ import googleapiclient.errors
 import google.oauth2.credentials
 import dateparser
 
+from app.ai import evaluate_comment
 from app.auth import _credentials_to_dict
 
 bp = Blueprint('main', __name__, )
@@ -33,7 +34,7 @@ def get_comments_until_datetime(channel_id, target_datetime):
         comments.extend(each_comments)
         if page_token is None:
             break
-    return {'counts': len(comments), 'comments': comments}
+    return comments
 
 
 def _get_comments_by_page_token(channel_id, target_datetime, page_token=None) -> Tuple[List[dict], str]:
@@ -77,6 +78,8 @@ def test():
         tz=datetime.UTC) - datetime.timedelta(days=1)
 
     comments = get_comments_until_datetime(channel_id, target_datetime)
+    for i, comment in enumerate(comments):
+        comments[i]["blocked"] = evaluate_comment(comment)
     return jsonify(comments)
 
 

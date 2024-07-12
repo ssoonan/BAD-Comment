@@ -1,13 +1,8 @@
-from flask import Blueprint, abort, g, make_response, redirect, request, session, url_for, Response
-from google.oauth2 import id_token
-from google.auth.transport.requests import Request
+from flask import Blueprint, redirect, request, session, url_for, Response
 from dotenv import load_dotenv
 
-import requests
-import os
-import time
+
 import google_auth_oauthlib.flow
-import datetime
 
 
 load_dotenv()
