@@ -1,62 +1,12 @@
 import datetime
 from typing import List, Tuple
 from flask import session, abort, jsonify, Blueprint, redirect, url_for, Response
-import googleapiclient.discovery
-import googleapiclient.errors
-import google.oauth2.credentials
-import dateparser
+
 
 from app.ai import evaluate_comment
-from app.auth import _credentials_to_dict
+from app.youtube import block_comment, get_comments_until_datetime
 
 bp = Blueprint('main', __name__, )
-
-
-def make_youtube_api():
-    api_service_name = "youtube"
-    api_version = "v3"
-    credentials = session.get('credentials')
-    if credentials is None:
-        return abort(403)
-    credentials = google.oauth2.credentials.Credentials(**credentials)
-    youtube = googleapiclient.discovery.build(
-        api_service_name, api_version, credentials=credentials)
-    session['credentials'] = _credentials_to_dict(credentials)
-    return youtube
-
-
-def get_comments_until_datetime(channel_id, target_datetime):
-    comments = []
-    page_token = None
-    while True:
-        each_comments, page_token = _get_comments_by_page_token(
-            channel_id, target_datetime, page_token)
-        comments.extend(each_comments)
-        if page_token is None:
-            break
-    return comments
-
-
-def _get_comments_by_page_token(channel_id, target_datetime, page_token=None) -> Tuple[List[dict], str]:
-    params = {'allThreadsRelatedToChannelId': channel_id,
-              'part': 'snippet', 'pageToken': page_token}
-    youtube = make_youtube_api()
-    request = youtube.commentThreads().list(**params)
-    response = request.execute()
-    comments = response['items']
-    page_token = response['nextPageToken']
-    filtered_comments = []
-    for comment in comments:
-        comment_datetime = _get_comment_datetime(comment)
-        if comment_datetime < target_datetime:
-            page_token = None
-            break
-        filtered_comments.append(comment)
-    return filtered_comments, page_token
-
-
-def _get_comment_datetime(comment):
-    return dateparser.parse(comment['snippet']['topLevelComment']['snippet']['publishedAt'])
 
 
 @bp.after_request
@@ -79,7 +29,11 @@ def test():
 
     comments = get_comments_until_datetime(channel_id, target_datetime)
     for i, comment in enumerate(comments):
-        comments[i]["blocked"] = evaluate_comment(comment)
+        result = evaluate_comment(comment)
+        if result:
+            # 로깅으로 바꾸기
+            print(comment['snippet'])
+            block_comment(comment)
     return jsonify(comments)
 
 

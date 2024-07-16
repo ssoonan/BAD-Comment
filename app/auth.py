@@ -13,6 +13,14 @@ SCOPES = ["https://www.googleapis.com/auth/youtube",
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
+def save_credentials(credentials):
+    session['credentials'] = _credentials_to_dict(credentials)
+
+
+def get_credentials():
+    return session.get('credentials')
+
+
 def _credentials_to_dict(credentials):
     return {'token': credentials.token,
             'refresh_token': credentials.refresh_token,
