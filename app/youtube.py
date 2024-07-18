@@ -56,6 +56,13 @@ def _get_comment_datetime(comment):
     return dateparser.parse(comment['snippet']['topLevelComment']['snippet']['publishedAt'])
 
 
+def get_my_youtube_channel():
+    youtube = make_youtube_api()
+    request = youtube.channels().list(part="id", mine=True)
+    response = request.execute()
+    return response['items'][0]
+
+
 def block_comment(comment):
     youtube = make_youtube_api()
     request = youtube.comments().setModerationStatus(
