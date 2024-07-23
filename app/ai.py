@@ -6,7 +6,7 @@ openai_client = OpenAI(api_key=os.environ['OPENAI_KEY'])
 
 def request_to_openai(user_prompt, system_prompt):
     response = openai_client.chat.completions.create(
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
