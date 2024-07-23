@@ -1,24 +1,18 @@
 from typing import List, Tuple
-from flask import abort
 
-from app.auth import get_credentials, save_credentials
+from app.auth import get_and_refresh_access_token
 
 import googleapiclient.discovery
-import google.oauth2.credentials
 import dateparser
 
 
 def make_youtube_api():
     api_service_name = "youtube"
     api_version = "v3"
-    credentials = get_credentials()
-    if credentials is None:
-        return abort(403)
-    credentials = google.oauth2.credentials.Credentials(**credentials)
+    # TODO: 매 요청마다 저장할 필요는 없게 만들기. 시간 재서 수동?
+    credentials = get_and_refresh_access_token()
     youtube = googleapiclient.discovery.build(
         api_service_name, api_version, credentials=credentials)
-    # refresh 되었을 시 갱신
-    save_credentials(credentials)
     return youtube
 
 

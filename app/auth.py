@@ -1,11 +1,13 @@
-from flask import Blueprint, redirect, request, session, url_for, Response
-from dotenv import load_dotenv
-
-
+from google.oauth2 import id_token
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
+from flask import Blueprint, abort, redirect, request, session, url_for, Response
 import google_auth_oauthlib.flow
+import google.oauth2.credentials
+
+from app.model import User
 
 
-load_dotenv()
 SCOPES = ["https://www.googleapis.com/auth/youtube",
           "https://www.googleapis.com/auth/youtube.readonly",
           "https://www.googleapis.com/auth/youtube.force-ssl"]
@@ -13,16 +15,19 @@ SCOPES = ["https://www.googleapis.com/auth/youtube",
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
 
-def save_credentials(credentials):
-    session['credentials'] = _credentials_to_dict(credentials)
-
-
 def get_credentials():
     return session.get('credentials')
 
 
+def _jwt_to_user(credentials) -> User:
+    user_info = id_token.verify_oauth2_token(
+        credentials.id_token, Request(), credentials.client_id)
+    return User(user_info)
+
+
 def _credentials_to_dict(credentials):
     return {'token': credentials.token,
+            'id_token': credentials.id_token,
             'refresh_token': credentials.refresh_token,
             'token_uri': credentials.token_uri,
             'client_id': credentials.client_id,
@@ -36,7 +41,18 @@ def _save_to_session(data):
 
 
 def save_credentials(credentials):  # 이후 db 저장까지 연결
+    user = _jwt_to_user(credentials)
+    user.save()
     _save_to_session(_credentials_to_dict(credentials))
+
+
+def get_and_refresh_access_token() -> Credentials:
+    credentials = get_credentials()
+    if credentials is None:
+        return abort(403)
+    refreshed_credentials = google.oauth2.credentials.Credentials(**credentials)
+    save_credentials(refreshed_credentials)
+    return refreshed_credentials
 
 
 @bp.after_request
@@ -61,7 +77,7 @@ def authorize():
 def callback():
     state = session['state']
     flow = google_auth_oauthlib.flow.Flow.from_client_secrets_file(
-        'client_secret.json', scopes=SCOPES, state=state)
+        'client_secret.json', scopes=None, state=state)
     flow.redirect_uri = url_for("auth.callback", _external=True)
 
     authorization_response = request.url
