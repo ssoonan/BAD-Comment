@@ -5,7 +5,7 @@ from flask import Blueprint, abort, redirect, request, session, url_for, Respons
 import google_auth_oauthlib.flow
 import google.oauth2.credentials
 
-from app.model import User
+from app.db.model import User
 
 
 SCOPES = ["https://www.googleapis.com/auth/youtube",
@@ -25,9 +25,9 @@ def _jwt_to_user(credentials) -> User:
     return User(user_info)
 
 
+# 순전히 access_token, refresh_token에 해당한 정보만 포함
 def _credentials_to_dict(credentials):
     return {'token': credentials.token,
-            'id_token': credentials.id_token,
             'refresh_token': credentials.refresh_token,
             'token_uri': credentials.token_uri,
             'client_id': credentials.client_id,
@@ -36,22 +36,33 @@ def _credentials_to_dict(credentials):
             }
 
 
-def _save_to_session(data):
-    session['credentials'] = data
-
-
-def save_credentials(credentials):  # 이후 db 저장까지 연결
+def save_credentials(credentials):
+    # 이게 403이 아니라 그냥 500이 뜨네,
     user = _jwt_to_user(credentials)
+    user.access_token = credentials.token
+    user.refresh_token = credentials.refresh_token
     user.save()
-    _save_to_session(_credentials_to_dict(credentials))
+    session['credentials'] = _credentials_to_dict(credentials)
+    session['id'] = user.id
+
+
+# 1. db내 access_token 갱신 2. session내 갱신
+def update_token(access_token):
+    user_id = session['id']
+    user = User.get(user_id)
+    user.access_token = access_token
+    user.save()
+    session['credentials']['token'] = access_token
 
 
 def get_and_refresh_access_token() -> Credentials:
     credentials = get_credentials()
+    # 1. access_token X -> 인증 새로
     if credentials is None:
         return abort(403)
+    # access_token이 만료되면 refresh_token으로 인해 자동 갱신
     refreshed_credentials = google.oauth2.credentials.Credentials(**credentials)
-    save_credentials(refreshed_credentials)
+    update_token(refreshed_credentials.token)
     return refreshed_credentials
 
 

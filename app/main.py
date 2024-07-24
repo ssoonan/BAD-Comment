@@ -1,6 +1,5 @@
 import datetime
-from typing import List, Tuple
-from flask import render_template, session, abort, jsonify, Blueprint, redirect, url_for, Response
+from flask import render_template, jsonify, Blueprint, redirect, url_for, Response
 
 
 from app.ai import evaluate_comment
@@ -24,7 +23,7 @@ def index():
 @bp.route('/test')
 def test():
     target_datetime = datetime.datetime.now(
-        tz=datetime.UTC) - datetime.timedelta(days=1)
+        tz=datetime.UTC) - datetime.timedelta(days=5)
     youtube_channel = get_my_youtube_channel()
     comments = get_comments_until_datetime(
         youtube_channel['id'], target_datetime)
@@ -33,5 +32,5 @@ def test():
         if result:
             # 로깅으로 바꾸기
             print(comment['snippet'])
-            block_comment(comment)
+            # block_comment(comment)
     return jsonify(comments)

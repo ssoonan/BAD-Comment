@@ -9,7 +9,6 @@ import dateparser
 def make_youtube_api():
     api_service_name = "youtube"
     api_version = "v3"
-    # TODO: 매 요청마다 저장할 필요는 없게 만들기. 시간 재서 수동?
     credentials = get_and_refresh_access_token()
     youtube = googleapiclient.discovery.build(
         api_service_name, api_version, credentials=credentials)
